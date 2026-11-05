@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seam Bonder v3</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Interactive 3D CAD model of the seam bonder: 1,114 bodies, browsable by assembly, with explode and section views.">
+<style>
+:root{--bg:#eef0f2;--panel:#ffffffee;--ink:#1c2126;--mute:#5d6873;--line:#d5dade;--accent:#0b6bcb;--gap:12px;--r:10px;--panel-w:300px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#15181b;--panel:#1e2327ee;--ink:#e8ecef;--mute:#9aa6b1;--line:#333b42;--accent:#5aa9f5}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.4 var(--font)}
+#view{position:fixed;inset:0;touch-action:none}
+canvas{display:block}
+.panel{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(8px)}
+#side{top:var(--gap);left:var(--gap);bottom:var(--gap);width:var(--panel-w);display:flex;flex-direction:column;overflow:hidden}
+#side header{padding:var(--gap);border-bottom:1px solid var(--line)}
+h1{font-size:16px;margin:0}
+#sub{color:var(--mute);font-size:12px}
+#tools{padding:var(--gap);border-bottom:1px solid var(--line);display:grid;gap:8px}
+.row{display:flex;align-items:center;gap:8px}
+.row label{flex:0 0 58px;color:var(--mute);font-size:12px}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+button,select{font:inherit;font-size:12px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#tree{overflow:auto;padding:8px var(--gap);flex:1}
+#tree ul{list-style:none;margin:0;padding:0 0 0 18px}
+#tree>ul{padding:0}
+#tree li{margin:2px 0}
+.item{display:flex;align-items:center;gap:6px}
+.item input{accent-color:var(--accent);margin:0}
+.item .nm{flex:1;min-width:0;background:none;border:0;padding:2px 0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.item .ct{color:var(--mute);font-size:11px}
+#info{right:var(--gap);bottom:var(--gap);width:var(--panel-w);padding:var(--gap);display:none}
+#info.on{display:block}
+#info h2{font-size:14px;margin:0 28px 4px 0;overflow-wrap:anywhere}
+#info p{margin:2px 0;font-size:12px;color:var(--mute)}
+#info .x{position:absolute;top:8px;right:8px;border:0;font-size:16px;line-height:1;padding:2px 6px}
+#hint{position:fixed;right:var(--gap);top:var(--gap);padding:6px 10px;color:var(--mute);font-size:12px}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:2;text-align:center;padding:16px}
+#menu{display:none}
+@media (max-width:720px){
+ #side{top:auto;left:var(--gap);right:var(--gap);width:auto;bottom:var(--gap);max-height:45vh}
+ #side.shut #tools,#side.shut #tree{display:none}
+ #side header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+ #menu{display:block}
+ #info{left:var(--gap);right:var(--gap);bottom:auto;top:var(--gap);width:auto}
+ #hint{display:none}
+}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="view"></div>
+<aside id="side" class="panel shut">
+ <header><div><h1>Seam Bonder v3</h1><div id="sub"></div></div><button id="menu" aria-expanded="false">Controls</button></header>
+ <div id="tools">
+  <div class="seg" role="group" aria-label="Camera views">
+   <button data-v="1,-1,.7">Iso</button><button data-v="0,-1,0">Front</button><button data-v="1,0,0">Side</button><button data-v="0,0,1">Top</button><button data-v="-1,1,-.6">Under</button>
+  </div>
+  <div class="row"><label for="ex">Explode</label><input id="ex" type="range" min="0" max="1" step="0.01" value="0"></div>
+  <div class="row"><label for="sec">Section</label><input id="sec" type="range" min="0" max="1" step="0.002" value="1"><select id="ax" aria-label="Section axis"><option value="1">Y</option><option value="0">X</option><option value="2">Z</option></select></div>
+  <div class="seg"><button id="all">Show all</button></div>
+ </div>
+ <div id="tree"></div>
+</aside>
+<div id="info" class="panel" aria-live="polite"><button class="x" aria-label="Close">×</button><h2></h2><p id="ia"></p><p id="is"></p><p id="im"></p><div class="seg" style="margin-top:8px"><button id="iso">Isolate assembly</button></div></div>
+<div id="hint" class="panel">Drag to orbit · right-drag to pan · scroll to zoom · click a part</div>
+<div id="load" role="status">Loading model…</div>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
+
+const BASE='https://cdn.jsdelivr.net/gh/NoobyNull/seam-bonder-viewer@v1/'; // ponytail: model lives on jsDelivr because the connector only takes inline files
+const $=s=>document.querySelector(s), CREASE=Math.PI/6, IN=25.4;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fail=e=>{$('#load').textContent='The model failed to load: '+e.message;console.error(e)};
+
+async function load(){
+  const [scene,buf]=await Promise.all([
+    fetch(BASE+'scene.json').then(r=>{if(!r.ok)throw Error('scene.json '+r.status);return r.json()}),
+    fetch(BASE+'model.dat').then(r=>{if(!r.ok)throw Error('model.dat '+r.status);return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()})]);
+  return {scene,bytes:new Uint8Array(buf)};
+}
+// inverse of bake/pack.py: byte planes -> uint16 stream -> per-mesh deltas
+function decode(scene,bytes){
+  const n=bytes.length/2, raw=new Uint16Array(n);
+  for(let i=0;i<n;i++) raw[i]=bytes[i]|bytes[i+n]<<8;
+  let o=0; const pos=scene.protos.map(p=>{const a=raw.subarray(o,o+p.v*3);o+=p.v*3;return a});
+  return scene.protos.map((p,k)=>{
+    const a=pos[k], P=new Float32Array(p.v*3);
+    for(let c=0;c<3;c++){let q=0;for(let i=0;i<p.v;i++){q=(q+a[c*p.v+i])&65535;P[i*3+c]=p.lo[c]+q/65535*p.sc[c]}}
+    const I=new Uint32Array(p.f*3);let q=0;
+    for(let i=0;i<I.length;i++){q=(q+raw[o++])&65535;I[i]=q}
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(P,3)); g.setIndex(new THREE.BufferAttribute(I,1));
+    const c=toCreasedNormals(g,CREASE); g.dispose(); c.computeBoundingSphere(); return c;
+  });
+}
+
+const {scene:S,bytes}=await load().catch(e=>{fail(e);throw e});
+const lo=new THREE.Vector3(...S.lo), hi=new THREE.Vector3(...S.hi);
+const center=lo.clone().add(hi).multiplyScalar(.5), size=hi.clone().sub(lo), diag=size.length();
+
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.localClippingEnabled=true;
+$('#view').append(renderer.domElement);
+const world=new THREE.Scene();
+const pm=new THREE.PMREMGenerator(renderer);
+world.environment=pm.fromScene(new RoomEnvironment(renderer),.04).texture;
+const camera=new THREE.PerspectiveCamera(35,1,diag/500,diag*20);
+camera.up.set(0,0,1);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.target.copy(center);
+controls.addEventListener('change',()=>dirty=true);
+
+const clip=new THREE.Plane(new THREE.Vector3(0,-1,0),hi.y+1);
+const mat=new THREE.MeshStandardMaterial({metalness:.35,roughness:.55,side:THREE.DoubleSide,clippingPlanes:[clip]});
+const geos=decode(S,bytes);
+
+// bodies -> instanced meshes
+const col=new THREE.Color(), M=new THREE.Matrix4(), ZERO=new THREE.Matrix4().makeScale(0,0,0);
+const top=a=>{while(a>=0&&S.asms[a].p>=0)a=S.asms[a].p;return a};
+const groups=S.protos.map(()=>[]);
+S.bodies.forEach((b,i)=>{b.i=i;b.k=groups[b.p].length;groups[b.p].push(b);b.on=true;
+  const m=b.m;b.M=new THREE.Matrix4().set(m[0],m[1],m[2],m[9],m[3],m[4],m[5],m[10],m[6],m[7],m[8],m[11],0,0,0,1);
+  b.col=new THREE.Color().setRGB(...b.c,THREE.SRGBColorSpace)});
+const meshes=geos.map((g,p)=>{
+  const im=new THREE.InstancedMesh(g,mat,groups[p].length);im.frustumCulled=false;im.userData.b=groups[p];
+  groups[p].forEach(b=>{im.setColorAt(b.k,b.col);b.im=im});world.add(im);return im});
+
+// explode: every assembly moves out from the model centre along its own centroid
+const asmC=S.asms.map(()=>({s:new THREE.Vector3(),n:0}));
+const V=new THREE.Vector3();
+S.bodies.forEach(b=>{if(b.a<0)return;V.set(0,0,0).applyMatrix4(b.M);V.copy(geos[b.p].boundingSphere.center).applyMatrix4(b.M);asmC[b.a].s.add(V);asmC[b.a].n++});
+const off=asmC.map(c=>c.n?c.s.divideScalar(c.n).sub(center):new THREE.Vector3());
+function place(){
+  const k=+$('#ex').value*1.2;
+  S.bodies.forEach(b=>{
+    if(!b.on){b.im.setMatrixAt(b.k,ZERO);return}
+    M.copy(b.M); if(k&&b.a>=0){const o=off[b.a];M.elements[12]+=o.x*k;M.elements[13]+=o.y*k;M.elements[14]+=o.z*k}
+    b.im.setMatrixAt(b.k,M)});
+  meshes.forEach(m=>m.instanceMatrix.needsUpdate=true); dirty=true;
+}
+
+// assembly tree
+const kids=S.asms.map(()=>[]), roots=[];
+S.asms.forEach((a,i)=>a.p>=0?kids[a.p].push(i):roots.push(i));
+const under=i=>[i,...kids[i].flatMap(under)];
+const count=i=>S.bodies.filter(b=>under(i).includes(b.a)).length;
+const boxes=[];
+function branch(list){
+  const ul=document.createElement('ul');
+  for(const i of list){
+    if(!count(i)){boxes[i]={checked:true};continue}  // inactive configuration: no bodies
+    const li=document.createElement('li'),row=document.createElement('div');row.className='item';
+    const cb=Object.assign(document.createElement('input'),{type:'checkbox',checked:true});
+    cb.setAttribute('aria-label','Show '+S.asms[i].n); boxes[i]=cb;
+    cb.onchange=()=>{under(i).forEach(a=>boxes[a].checked=cb.checked);apply()};
+    const nm=Object.assign(document.createElement('button'),{className:'nm',textContent:S.asms[i].n,title:'Isolate '+S.asms[i].n});
+    nm.onclick=()=>isolate(i);
+    const ct=Object.assign(document.createElement('span'),{className:'ct',textContent:count(i)});
+    row.append(cb,nm,ct);li.append(row);if(kids[i].length)li.append(branch(kids[i]));ul.append(li);
+  }
+  return ul;
+}
+$('#tree').append(branch(roots));
+function apply(){S.bodies.forEach(b=>b.on=b.a<0||boxes[b.a].checked);place()}
+function isolate(i){const keep=new Set(under(i));let a=i;while(a>=0){keep.add(a);a=S.asms[a].p}
+  boxes.forEach((c,k)=>c.checked=keep.has(k));apply()}
+$('#all').onclick=()=>{boxes.forEach(c=>c.checked=true);apply()};
+
+// views, section, explode
+function fit(dir){
+  const d=dir.clone().normalize(), s=diag/2/Math.tan(camera.fov*Math.PI/360)*(camera.aspect<1?1/camera.aspect:1);
+  controls.target.copy(center);camera.position.copy(center).addScaledVector(d,s*.8);controls.update();dirty=true;
+}
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>fit(new THREE.Vector3(...b.dataset.v.split(',').map(Number))));
+function section(){
+  const a=+$('#ax').value,t=+$('#sec').value,n=[0,0,0];n[a]=-1;
+  clip.normal.fromArray(n);clip.constant=t>=1?diag*4:lo.getComponent(a)+size.getComponent(a)*t;dirty=true;
+}
+$('#sec').oninput=section;$('#ax').onchange=section;$('#ex').oninput=place;
+
+// pick
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2(),info=$('#info');let sel=null,down=null;
+function select(b){
+  if(sel)sel.im.setColorAt(sel.k,sel.col),sel.im.instanceColor.needsUpdate=true;
+  sel=b;info.classList.toggle('on',!!b);dirty=true;if(!b)return;
+  b.im.setColorAt(b.k,col.set(css('--accent')));b.im.instanceColor.needsUpdate=true;
+  const base=b.n.replace(/\s*\(\d+\)$/,''),sp=S.specs[base];
+  info.querySelector('h2').textContent=base;
+  $('#ia').textContent=b.a>=0?S.asms[b.a].n:'';$('#is').textContent=sp?.s||'';$('#im').textContent=sp?.m&&sp.m!=='-'?'Material: '+sp.m:'';
+}
+info.querySelector('.x').onclick=()=>select(null);
+$('#iso').onclick=()=>sel&&sel.a>=0&&isolate(sel.a);
+const el=renderer.domElement;
+el.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+el.addEventListener('pointerup',e=>{
+  if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>4)return;
+  const r=el.getBoundingClientRect();ptr.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(meshes,false).find(h=>clip.distanceToPoint(h.point)>=0&&h.object.userData.b[h.instanceId].on);
+  select(hit?hit.object.userData.b[hit.instanceId]:null);
+});
+
+$('#menu').onclick=e=>{const s=$('#side').classList.toggle('shut');e.target.setAttribute('aria-expanded',!s)};
+$('#sub').textContent=`${S.bodies.length.toLocaleString()} bodies · ${(size.x/IN).toFixed(0)} × ${(size.y/IN).toFixed(0)} × ${(size.z/IN).toFixed(0)} in`;
+
+let dirty=true;
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true}
+addEventListener('resize',resize);resize();
+place();section();fit(new THREE.Vector3(1,-1,.7));
+$('#load').remove();
+window.__viewer={S,camera,meshes,select,isolate};
+renderer.setAnimationLoop(()=>{controls.update();if(dirty){dirty=false;renderer.render(world,camera)}});
+</script>
+</body>
+</html>
