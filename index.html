@@ -7,8 +7,8 @@
 <link rel="icon" href="data:,">
 <meta name="description" content="Interactive 3D CAD model of the seam bonder: 1,114 bodies, browsable by assembly, with explode and section views.">
 <style>
-:root{--bg:#eef0f2;--panel:#ffffffee;--ink:#1c2126;--mute:#5d6873;--line:#d5dade;--accent:#0b6bcb;--gap:12px;--r:10px;--panel-w:300px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#15181b;--panel:#1e2327ee;--ink:#e8ecef;--mute:#9aa6b1;--line:#333b42;--accent:#5aa9f5}}
+:root{--bg:#eef0f2;--panel:#ffffffee;--ink:#1c2126;--mute:#5d6873;--line:#d5dade;--accent:#0b6bcb;--gap:12px;--r:10px;--panel-w:300px;--solid:#fff;--flip:450ms;--fly:700ms;--card-h:52dvh;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#15181b;--panel:#1e2327ee;--ink:#e8ecef;--mute:#9aa6b1;--line:#333b42;--accent:#5aa9f5;--solid:#1e2327}}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.4 var(--font)}
 #view{position:fixed;inset:0;touch-action:none}
@@ -26,6 +26,9 @@ h1{font-size:16px;margin:0}
 button,select{font:inherit;font-size:12px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer}
 button:hover{border-color:var(--accent)}
 button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#flip,.face{display:contents}
+#rearhead,#toparts{display:none}
+#find{margin:var(--gap) var(--gap) 0;padding:6px 8px;font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px}
 #tree{overflow:auto;padding:8px var(--gap);flex:1}
 #tree ul{list-style:none;margin:0;padding:0 0 0 18px}
 #tree>ul{padding:0}
@@ -34,28 +37,51 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .item input{accent-color:var(--accent);margin:0}
 .item .nm{flex:1;min-width:0;background:none;border:0;padding:2px 0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .item .ct{color:var(--mute);font-size:11px}
+.parts summary{color:var(--mute);font-size:12px;cursor:pointer;padding:2px 0}
+.parts ul{padding:0}
+.pt{display:flex;width:100%;gap:6px;justify-content:space-between;border:0;padding:3px 0;text-align:left;font-size:12px}
+.pt span:last-child{color:var(--mute);flex:none}
 #info{right:var(--gap);bottom:var(--gap);width:var(--panel-w);padding:var(--gap);display:none}
 #info.on{display:block}
 #info h2{font-size:14px;margin:0 28px 4px 0;overflow-wrap:anywhere}
 #info p{margin:2px 0;font-size:12px;color:var(--mute)}
+.vis{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.vis input{accent-color:var(--accent);margin:0}
 #info .x{position:absolute;top:8px;right:8px;border:0;font-size:16px;line-height:1;padding:2px 6px}
 #hint{position:fixed;right:var(--gap);top:var(--gap);padding:6px 10px;color:var(--mute);font-size:12px}
 #load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:2;text-align:center;padding:16px}
 #menu{display:none}
-@media (max-width:720px){
- #side{top:auto;left:var(--gap);right:var(--gap);width:auto;bottom:var(--gap);max-height:45vh}
- #side.shut #tools,#side.shut #tree{display:none}
- #side header{display:flex;justify-content:space-between;align-items:center;gap:8px}
- #menu{display:block}
- #info{left:var(--gap);right:var(--gap);bottom:auto;top:var(--gap);width:auto}
- #hint{display:none}
-}
+.mobile #side{top:auto;left:var(--gap);right:var(--gap);width:auto;bottom:var(--gap);height:var(--card-h);display:block;overflow:visible;background:none;border:0;backdrop-filter:none;perspective:1200px}
+.mobile #flip{display:block;position:relative;height:100%;transform-style:preserve-3d;transition:transform var(--flip) ease}
+.mobile #side.back #flip{transform:rotateY(180deg)}
+.mobile .face{display:flex;flex-direction:column;position:absolute;inset:0;overflow:hidden;background:var(--solid);border:1px solid var(--line);border-radius:var(--r);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.mobile #rear{transform:rotateY(180deg)}
+.mobile #side header,.mobile #rearhead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:var(--gap);border-bottom:1px solid var(--line)}
+.mobile #tools{border-bottom:0;flex:1;align-content:start}
+.mobile #menu,.mobile #toparts{display:block}
+.mobile #toparts{margin-top:4px;padding:10px;font-size:14px;width:100%}
+.mobile #side.shut{height:auto}
+.mobile #side.shut #flip{height:auto}
+.mobile #side.shut #front{position:static}
+.mobile #side.shut #tools,.mobile #side.shut #rear{display:none}
+.mobile #side.shut header{border-bottom:0}
+.mobile button,.mobile select{padding:8px 12px;font-size:14px}
+.mobile #find{font-size:16px}
+.mobile .item .nm{padding:8px 0;font-size:14px;font-weight:600}
+.mobile .item input{width:20px;height:20px}
+.mobile .pt{padding:10px 0;font-size:14px;border-top:1px solid var(--line);border-radius:0}
+.mobile .parts summary{padding:6px 0}
+.mobile #info{left:var(--gap);right:var(--gap);bottom:auto;top:var(--gap);width:auto}
+.mobile #hint{display:none}
+@media (prefers-reduced-motion:reduce){.mobile #flip{transition:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
 </head>
 <body>
 <div id="view"></div>
 <aside id="side" class="panel shut">
+<div id="flip">
+<section id="front" class="face">
  <header><div><h1>Seam Bonder v3</h1><div id="sub"></div></div><button id="menu" aria-expanded="false">Controls</button></header>
  <div id="tools">
   <div class="seg" role="group" aria-label="Camera views">
@@ -64,10 +90,17 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   <div class="row"><label for="ex">Explode</label><input id="ex" type="range" min="0" max="1" step="0.01" value="0"></div>
   <div class="row"><label for="sec">Section</label><input id="sec" type="range" min="0" max="1" step="0.002" value="1"><select id="ax" aria-label="Section axis"><option value="1">Y</option><option value="0">X</option><option value="2">Z</option></select></div>
   <div class="seg"><button id="all">Show all</button></div>
+  <button id="toparts">Parts list</button>
  </div>
+</section>
+<section id="rear" class="face">
+ <div id="rearhead"><h1>Parts</h1><button id="tofront">Controls</button></div>
+ <input id="find" type="search" placeholder="Find a part" aria-label="Find a part">
  <div id="tree"></div>
+</section>
+</div>
 </aside>
-<div id="info" class="panel" aria-live="polite"><button class="x" aria-label="Close">×</button><h2></h2><p id="ia"></p><p id="is"></p><p id="im"></p><div class="seg" style="margin-top:8px"><button id="iso">Isolate assembly</button></div></div>
+<div id="info" class="panel" aria-live="polite"><button class="x" aria-label="Close">×</button><h2></h2><p id="ia"></p><p id="is"></p><p id="im"></p><div class="seg" style="margin-top:8px;align-items:center;gap:12px"><label class="vis"><input id="vis" type="checkbox" checked>Visible</label><button id="iso">Isolate assembly</button></div></div>
 <div id="hint" class="panel">Drag to orbit · right-drag to pan · scroll to zoom · click a part</div>
 <div id="load" role="status">Loading model…</div>
 <script type="module">
@@ -76,16 +109,23 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 
-const BASE='https://cdn.jsdelivr.net/gh/NoobyNull/seam-bonder-viewer@v1/'; // ponytail: model lives on jsDelivr because the connector only takes inline files
+const REPO='NoobyNull/seam-bonder-viewer';
 const $=s=>document.querySelector(s), CREASE=Math.PI/6, IN=25.4;
+const OS=navigator.userAgentData?.mobile||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform));
+const setMode=()=>document.documentElement.classList.toggle('mobile',OS||matchMedia('(max-width:720px)').matches);
+const isMobile=()=>document.documentElement.classList.contains('mobile');
+setMode();
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fail=e=>{$('#load').textContent='The model failed to load: '+e.message;console.error(e)};
 
+// always the newest commit on main; pinning to its sha keeps mesh and scene a matching pair
 async function load(){
+  const sha=await fetch(`https://api.github.com/repos/${REPO}/commits/main`).then(r=>r.ok?r.json():null).then(j=>j?.sha).catch(()=>null);
+  const BASE=`https://cdn.jsdelivr.net/gh/${REPO}@${sha||'main'}/`;  // rate-limited lookup: @main, can lag up to 12 h
   const [scene,buf]=await Promise.all([
     fetch(BASE+'scene.json').then(r=>{if(!r.ok)throw Error('scene.json '+r.status);return r.json()}),
     fetch(BASE+'model.dat').then(r=>{if(!r.ok)throw Error('model.dat '+r.status);return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()})]);
-  return {scene,bytes:new Uint8Array(buf)};
+  return {scene,bytes:new Uint8Array(buf),sha};
 }
 // inverse of bake/pack.py: byte planes -> uint16 stream -> per-mesh deltas
 function decode(scene,bytes){
@@ -103,7 +143,7 @@ function decode(scene,bytes){
   });
 }
 
-const {scene:S,bytes}=await load().catch(e=>{fail(e);throw e});
+const {scene:S,bytes,sha}=await load().catch(e=>{fail(e);throw e});
 const lo=new THREE.Vector3(...S.lo), hi=new THREE.Vector3(...S.hi);
 const center=lo.clone().add(hi).multiplyScalar(.5), size=hi.clone().sub(lo), diag=size.length();
 
@@ -126,7 +166,6 @@ const geos=decode(S,bytes);
 
 // bodies -> instanced meshes
 const col=new THREE.Color(), M=new THREE.Matrix4(), ZERO=new THREE.Matrix4().makeScale(0,0,0);
-const top=a=>{while(a>=0&&S.asms[a].p>=0)a=S.asms[a].p;return a};
 const groups=S.protos.map(()=>[]);
 S.bodies.forEach((b,i)=>{b.i=i;b.k=groups[b.p].length;groups[b.p].push(b);b.on=true;
   const m=b.m;b.M=new THREE.Matrix4().set(m[0],m[1],m[2],m[9],m[3],m[4],m[5],m[10],m[6],m[7],m[8],m[11],0,0,0,1);
@@ -146,7 +185,7 @@ function place(){
     if(!b.on){b.im.setMatrixAt(b.k,ZERO);return}
     M.copy(b.M); if(k&&b.a>=0){const o=off[b.a];M.elements[12]+=o.x*k;M.elements[13]+=o.y*k;M.elements[14]+=o.z*k}
     b.im.setMatrixAt(b.k,M)});
-  meshes.forEach(m=>m.instanceMatrix.needsUpdate=true); dirty=true;
+  meshes.forEach(m=>m.instanceMatrix.needsUpdate=true); mark(); dirty=true;
 }
 
 // assembly tree
@@ -154,7 +193,20 @@ const kids=S.asms.map(()=>[]), roots=[];
 S.asms.forEach((a,i)=>a.p>=0?kids[a.p].push(i):roots.push(i));
 const under=i=>[i,...kids[i].flatMap(under)];
 const count=i=>S.bodies.filter(b=>under(i).includes(b.a)).length;
-const boxes=[];
+const boxes=[], base=n=>n.replace(/\s*\(\d+\)$/,'');
+function parts(i,li){
+  const by=new Map();
+  S.bodies.forEach(b=>{if(b.a===i){const k=base(b.n);by.has(k)?by.get(k).push(b):by.set(k,[b])}});
+  if(!by.size)return;
+  const d=document.createElement('details'),ul=document.createElement('ul');d.className='parts';d.open=isMobile();
+  d.append(Object.assign(document.createElement('summary'),{textContent:`Parts (${by.size})`}));
+  [...by].sort((x,y)=>x[0].localeCompare(y[0])).forEach(([k,list])=>{
+    const r=document.createElement('li'),p=Object.assign(document.createElement('button'),{className:'pt'});
+    p.append(Object.assign(document.createElement('span'),{textContent:k}),Object.assign(document.createElement('span'),{textContent:list.length>1?'×'+list.length:''}));
+    p.onclick=()=>{locate(list);if(isMobile()){card('front');setTimeout(()=>card('shut'),FLIP)}};
+    r.append(p);ul.append(r)});
+  d.append(ul);li.append(d);
+}
 function branch(list){
   const ul=document.createElement('ul');
   for(const i of list){
@@ -166,20 +218,27 @@ function branch(list){
     const nm=Object.assign(document.createElement('button'),{className:'nm',textContent:S.asms[i].n,title:'Isolate '+S.asms[i].n});
     nm.onclick=()=>isolate(i);
     const ct=Object.assign(document.createElement('span'),{className:'ct',textContent:count(i)});
-    row.append(cb,nm,ct);li.append(row);if(kids[i].length)li.append(branch(kids[i]));ul.append(li);
+    row.append(cb,nm,ct);li.append(row);parts(i,li);if(kids[i].length)li.append(branch(kids[i]));ul.append(li);
   }
   return ul;
 }
 $('#tree').append(branch(roots));
-function apply(){S.bodies.forEach(b=>b.on=b.a<0||boxes[b.a].checked);place()}
+function apply(){S.bodies.forEach(b=>b.on=!b.hid&&(b.a<0||boxes[b.a].checked));place();
+  const n=S.bodies.filter(b=>b.hid).length;$('#all').textContent=n?`Show all (${n} hidden)`:'Show all'}
 function isolate(i){const keep=new Set(under(i));let a=i;while(a>=0){keep.add(a);a=S.asms[a].p}
   boxes.forEach((c,k)=>c.checked=keep.has(k));apply()}
-$('#all').onclick=()=>{boxes.forEach(c=>c.checked=true);apply()};
+$('#find').oninput=e=>{
+  const q=e.target.value.trim().toLowerCase();
+  document.querySelectorAll('.pt').forEach(p=>p.parentNode.hidden=!!q&&!p.textContent.toLowerCase().includes(q));
+  document.querySelectorAll('.parts').forEach(d=>d.open=q?!!d.querySelector('li:not([hidden])'):isMobile());
+  document.querySelectorAll('#tree>ul li:has(>.item)').forEach(l=>l.hidden=!!q&&!l.querySelector('.pt:not([hidden]),li:not([hidden]) .pt'));
+};
+$('#all').onclick=()=>{boxes.forEach(c=>c.checked=true);S.bodies.forEach(b=>b.hid=false);$('#vis').checked=true;apply()};
 
 // views, section, explode
 function fit(dir){
   const d=dir.clone().normalize(), s=diag/2/Math.tan(camera.fov*Math.PI/360)*(camera.aspect<1?1/camera.aspect:1);
-  controls.target.copy(center);camera.position.copy(center).addScaledVector(d,s*.8);controls.update();dirty=true;
+  tween=null;controls.target.copy(center);camera.position.copy(center).addScaledVector(d,s*.8);controls.update();dirty=true;
 }
 document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>fit(new THREE.Vector3(...b.dataset.v.split(',').map(Number))));
 function section(){
@@ -189,37 +248,69 @@ function section(){
 $('#sec').oninput=section;$('#ax').onchange=section;$('#ex').oninput=place;
 
 // pick
-const ray=new THREE.Raycaster(),ptr=new THREE.Vector2(),info=$('#info');let sel=null,down=null;
-function select(b){
-  if(sel)sel.im.setColorAt(sel.k,sel.col),sel.im.instanceColor.needsUpdate=true;
-  sel=b;info.classList.toggle('on',!!b);dirty=true;if(!b)return;
-  b.im.setColorAt(b.k,col.set(css('--accent')));b.im.instanceColor.needsUpdate=true;
-  const base=b.n.replace(/\s*\(\d+\)$/,''),sp=S.specs[base];
-  info.querySelector('h2').textContent=base;
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2(),info=$('#info');let sel=[],down=null,tween=null;
+const FLIP=parseFloat(css('--flip')),FLY=matchMedia('(prefers-reduced-motion:reduce)').matches?0:parseFloat(css('--fly'));
+// highlight drawn over everything, so a part buried inside the machine still shows
+const hl=new THREE.Group();world.add(hl);
+const hlMat=new THREE.MeshBasicMaterial({transparent:true,opacity:.45,depthTest:false,depthWrite:false,side:THREE.DoubleSide,clippingPlanes:[clip]});
+function mark(){hl.children.forEach(m=>{const b=m.userData.b;b.im.getMatrixAt(b.k,m.matrix);m.matrixWorldNeedsUpdate=true});dirty=true}
+function select(list){
+  sel.forEach(b=>{b.im.setColorAt(b.k,b.col);b.im.instanceColor.needsUpdate=true});
+  hl.clear();sel=list;info.classList.toggle('on',list.length>0);dirty=true;if(!list.length)return;
+  col.set(css('--accent'));hlMat.color.copy(col);
+  list.forEach(b=>{b.im.setColorAt(b.k,col);b.im.instanceColor.needsUpdate=true;
+    const m=new THREE.Mesh(geos[b.p],hlMat);m.matrixAutoUpdate=false;m.frustumCulled=false;m.renderOrder=1;m.userData.b=b;hl.add(m)});
+  mark();
+  const b=list[0],k=base(b.n),sp=S.specs[k];
+  $('#vis').checked=!b.hid;
+  info.querySelector('h2').textContent=k+(list.length>1?' ×'+list.length:'');
   $('#ia').textContent=b.a>=0?S.asms[b.a].n:'';$('#is').textContent=sp?.s||'';$('#im').textContent=sp?.m&&sp.m!=='-'?'Material: '+sp.m:'';
 }
-info.querySelector('.x').onclick=()=>select(null);
-$('#iso').onclick=()=>sel&&sel.a>=0&&isolate(sel.a);
+function locate(list){
+  list.forEach(b=>{b.hid=false;for(let a=b.a;a>=0;a=S.asms[a].p)boxes[a].checked=true});
+  if(+$('#sec').value<1){$('#sec').value=1;section()}
+  apply();select(list);
+  const box=new THREE.Box3(),one=new THREE.Box3(),sp=new THREE.Sphere();
+  list.forEach(b=>{b.im.getMatrixAt(b.k,M);box.union(sp.copy(geos[b.p].boundingSphere).applyMatrix4(M).getBoundingBox(one))});
+  const c=box.getCenter(new THREE.Vector3()),r=Math.max(box.getSize(new THREE.Vector3()).length()/2,diag*.06);
+  const dist=r/Math.sin(camera.fov*Math.PI/360)*1.3/Math.min(1,camera.aspect);
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:c.clone().addScaledVector(dir,dist),t1:c,s:performance.now()};
+}
+info.querySelector('.x').onclick=()=>select([]);
+$('#vis').onchange=e=>{sel.forEach(b=>b.hid=!e.target.checked);apply()};
+$('#iso').onclick=()=>sel[0]?.a>=0&&isolate(sel[0].a);
 const el=renderer.domElement;
-el.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+el.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];tween=null});
 el.addEventListener('pointerup',e=>{
   if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>4)return;
   const r=el.getBoundingClientRect();ptr.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
   ray.setFromCamera(ptr,camera);
   const hit=ray.intersectObjects(meshes,false).find(h=>clip.distanceToPoint(h.point)>=0&&h.object.userData.b[h.instanceId].on);
-  select(hit?hit.object.userData.b[hit.instanceId]:null);
+  select(hit?[hit.object.userData.b[hit.instanceId]]:[]);
 });
 
-$('#menu').onclick=e=>{const s=$('#side').classList.toggle('shut');e.target.setAttribute('aria-expanded',!s)};
-$('#sub').textContent=`${S.bodies.length.toLocaleString()} bodies · ${(size.x/IN).toFixed(0)} × ${(size.y/IN).toFixed(0)} × ${(size.z/IN).toFixed(0)} in`;
+let face='shut';
+function card(f){
+  face=f;const c=$('#side').classList;c.toggle('shut',f==='shut');c.toggle('back',f==='back');
+  $('#front').inert=isMobile()&&f==='back';$('#rear').inert=isMobile()&&f!=='back';
+  $('#menu').setAttribute('aria-expanded',f!=='shut');
+}
+$('#menu').onclick=()=>card(face==='shut'?'front':'shut');
+$('#toparts').onclick=()=>card('back');
+$('#tofront').onclick=()=>card('front');
+$('#sub').textContent=`${S.bodies.length.toLocaleString()} bodies · ${(size.x/IN).toFixed(0)} × ${(size.y/IN).toFixed(0)} × ${(size.z/IN).toFixed(0)} in${sha?' · '+sha.slice(0,7):''}`;
 
 let dirty=true;
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true}
+function resize(){setMode();card(face);const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true}
 addEventListener('resize',resize);resize();
 place();section();fit(new THREE.Vector3(1,-1,.7));
 $('#load').remove();
 window.__viewer={S,camera,meshes,select,isolate};
-renderer.setAnimationLoop(()=>{controls.update();if(dirty){dirty=false;renderer.render(world,camera)}});
+renderer.setAnimationLoop(now=>{
+  if(tween){const k=FLY?Math.min(1,(now-tween.s)/FLY):1,e=k*k*(3-2*k);
+    camera.position.lerpVectors(tween.p0,tween.p1,e);controls.target.lerpVectors(tween.t0,tween.t1,e);dirty=true;if(k===1)tween=null}
+  controls.update();if(dirty){dirty=false;renderer.render(world,camera)}});
 </script>
 </body>
 </html>
